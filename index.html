@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Übergabe" />
+  <title>Übergabeprotokoll</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Wohnungsübergabe</p>
+        <h1>Übergabeprotokoll</h1>
+        <p class="subline">Ausfüllen, direkt auf dem iPad unterschreiben und als fertige PDF teilen.</p>
+      </div>
+      <div class="privacy-pill" aria-label="Datenschutzhinweis">
+        <span class="privacy-dot"></span>
+        Daten bleiben auf diesem Gerät
+      </div>
+    </header>
+
+    <form id="handoverForm" novalidate>
+      <section class="card">
+        <div class="section-heading">
+          <span class="step">01</span>
+          <div>
+            <h2>Übergabe</h2>
+            <p>Grunddaten zur Wohnung und zum Termin</p>
+          </div>
+        </div>
+
+        <fieldset class="segmented" aria-label="Art der Übergabe">
+          <label>
+            <input type="radio" name="handoverType" value="Einzug" checked />
+            <span>Vor dem Einzug</span>
+          </label>
+          <label>
+            <input type="radio" name="handoverType" value="Auszug" />
+            <span>Vor dem Auszug</span>
+          </label>
+        </fieldset>
+
+        <div class="grid two">
+          <label class="field wide">
+            <span>Objekt / Zimmer <b>*</b></span>
+            <input id="objectRoom" name="objectRoom" type="text" autocomplete="off" placeholder="z. B. Hauptstraße 12 · Zimmer 3" required />
+          </label>
+          <label class="field">
+            <span>Vollständiger Name <b>*</b></span>
+            <input id="fullName" name="fullName" type="text" autocomplete="name" placeholder="Vor- und Nachname" required />
+          </label>
+          <label class="field">
+            <span>Ein-/Auszugsdatum <b>*</b></span>
+            <input id="moveDate" name="moveDate" type="date" required />
+          </label>
+        </div>
+
+        <div id="moveOutFields" class="conditional hidden" aria-hidden="true">
+          <div class="grid two">
+            <label class="field">
+              <span>IBAN <small>(bei Auszug)</small></span>
+              <input id="iban" name="iban" type="text" inputmode="text" autocomplete="off" placeholder="DE00 0000 0000 0000 0000 00" />
+            </label>
+            <label class="field">
+              <span>Neue Anschrift <small>(bei Auszug)</small></span>
+              <input id="newAddress" name="newAddress" type="text" autocomplete="street-address" placeholder="Straße, Hausnummer, PLZ, Ort" />
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="section-heading">
+          <span class="step">02</span>
+          <div>
+            <h2>Begehung & Zustand</h2>
+            <p>Mängel dokumentieren und Zustand abhaken</p>
+          </div>
+        </div>
+
+        <div class="grid two">
+          <label class="field">
+            <span>Datum der Begehung <b>*</b></span>
+            <input id="inspectionDate" name="inspectionDate" type="date" required />
+          </label>
+          <fieldset class="field defect-choice">
+            <legend>Mängel festgestellt?</legend>
+            <div class="inline-radios">
+              <label><input type="radio" name="defects" value="Keine" checked /> <span>Keine</span></label>
+              <label><input type="radio" name="defects" value="Folgende" /> <span>Folgende</span></label>
+            </div>
+          </fieldset>
+        </div>
+
+        <label id="defectDetailsWrap" class="field hidden" aria-hidden="true">
+          <span>Festgestellte Mängel</span>
+          <textarea id="defectDetails" name="defectDetails" rows="4" maxlength="550" placeholder="Mangel und möglichst genaue Stelle beschreiben …"></textarea>
+          <small class="char-count"><span id="defectCount">0</span>/550</small>
+        </label>
+
+        <div class="checklist-block">
+          <h3>Zustand des Zimmers</h3>
+          <label class="check-row">
+            <input id="checkWaste" type="checkbox" />
+            <span>Altglas, Müll und Pfand entsorgt</span>
+          </label>
+          <label class="check-row">
+            <input id="checkFloor" type="checkbox" />
+            <span>Zimmerboden gesaugt und feucht gewischt</span>
+          </label>
+          <label class="check-row">
+            <input id="checkFurniture" type="checkbox" />
+            <span>Oberflächen von allen Möbeln feucht gewischt</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="section-heading">
+          <span class="step">03</span>
+          <div>
+            <h2>Schlüssel</h2>
+            <p>Anzahl der übergebenen Schlüssel</p>
+          </div>
+        </div>
+
+        <div class="grid two">
+          <label class="field">
+            <span>Haus- und Wohnungsschlüssel</span>
+            <input id="houseKeys" name="houseKeys" type="number" min="0" max="20" inputmode="numeric" placeholder="0" />
+          </label>
+          <label class="field">
+            <span>Zimmerschlüssel</span>
+            <input id="roomKeys" name="roomKeys" type="number" min="0" max="20" inputmode="numeric" placeholder="0" />
+          </label>
+        </div>
+      </section>
+
+      <section class="card signatures-card">
+        <div class="section-heading">
+          <span class="step">04</span>
+          <div>
+            <h2>Unterschriften</h2>
+            <p>Direkt mit dem Apple Pencil in die Felder schreiben</p>
+          </div>
+        </div>
+
+        <div class="grid two">
+          <label class="field">
+            <span>Ort <b>*</b></span>
+            <input id="signPlace" name="signPlace" type="text" autocomplete="address-level2" placeholder="z. B. Stuttgart" required />
+          </label>
+          <label class="field">
+            <span>Datum <b>*</b></span>
+            <input id="signDate" name="signDate" type="date" required />
+          </label>
+        </div>
+
+        <div class="signature-grid">
+          <div class="signature-box">
+            <div class="signature-label">
+              <span>Unterschrift Mieter <b>*</b></span>
+              <button type="button" class="text-button" data-clear-signature="tenantSignature">Löschen</button>
+            </div>
+            <canvas id="tenantSignature" class="signature-canvas" aria-label="Unterschrift Mieter"></canvas>
+            <p>Hier mit Apple Pencil unterschreiben</p>
+          </div>
+          <div class="signature-box">
+            <div class="signature-label">
+              <span>Unterschrift Vermieter <b>*</b></span>
+              <button type="button" class="text-button" data-clear-signature="landlordSignature">Löschen</button>
+            </div>
+            <canvas id="landlordSignature" class="signature-canvas" aria-label="Unterschrift Vermieter"></canvas>
+            <p>Hier mit Apple Pencil unterschreiben</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="action-card">
+        <div id="statusMessage" class="status hidden" role="status" aria-live="polite"></div>
+        <button id="sharePdfButton" class="primary-button" type="submit">
+          <span>PDF erstellen & teilen</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0-12 4 4m-4-4-4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
+        </button>
+        <button id="downloadPdfButton" class="secondary-button" type="button">PDF herunterladen</button>
+        <button id="resetButton" class="ghost-button" type="button">Neue Übergabe – Formular leeren</button>
+        <p class="action-note">Beim Teilen wird eine fertige, nicht als Formular editierbare PDF erzeugt. Die Eingaben werden nicht automatisch gespeichert.</p>
+      </section>
+    </form>
+  </main>
+
+  <dialog id="resetDialog">
+    <form method="dialog" class="dialog-card">
+      <h2>Formular wirklich leeren?</h2>
+      <p>Alle Eingaben, Häkchen und beide Unterschriften werden entfernt.</p>
+      <div class="dialog-actions">
+        <button value="cancel" class="secondary-button">Abbrechen</button>
+        <button id="confirmReset" value="confirm" class="danger-button">Alles leeren</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
