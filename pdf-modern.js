@@ -9,14 +9,13 @@
   if (!form || !shareButton || !downloadButton) return;
 
   const $ = (id) => document.getElementById(id);
+  const clean = (value) => String(value || '').trim().replace(/\s+/g, ' ');
 
   const formatDate = (value) => {
     if (!value) return '';
     const [year, month, day] = value.split('-');
     return year && month && day ? `${day}.${month}.${year}` : value;
   };
-
-  const clean = (value) => String(value || '').trim().replace(/\s+/g, ' ');
 
   const sanitizeFilename = (value) => clean(value)
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -42,8 +41,7 @@
   function canvasHasInk(canvas) {
     if (!canvas || !canvas.width || !canvas.height) return false;
     try {
-      const ctx = canvas.getContext('2d');
-      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
       for (let i = 0; i < data.length; i += 16) {
         if (data[i] < 225 || data[i + 1] < 225 || data[i + 2] < 225) return true;
       }
@@ -60,14 +58,13 @@
     ['objectRoom', 'fullName', 'moveDate', 'inspectionDate', 'signPlace', 'signDate'].forEach((id) => {
       const el = $(id);
       if (!el || !clean(el.value)) {
-        if (el) el.classList.add('invalid');
+        el?.classList.add('invalid');
         if (!firstInvalid && el) firstInvalid = el;
       }
     });
 
-    const defects = form.elements.defects?.value;
     const defectDetails = $('defectDetails');
-    if (defects === 'Folgende' && !clean(defectDetails?.value)) {
+    if (form.elements.defects?.value === 'Folgende' && !clean(defectDetails?.value)) {
       defectDetails?.classList.add('invalid');
       if (!firstInvalid) firstInvalid = defectDetails;
     }
@@ -128,6 +125,7 @@
     const GAP = 10;
     const HALF = (CW - GAP) / 2;
     const COL2 = M + HALF + GAP;
+    const CONTENT_BOTTOM = 274;
 
     const ink = [29, 34, 43];
     const muted = [102, 108, 118];
@@ -136,6 +134,16 @@
     const soft = [246, 247, 249];
     const softStrong = [237, 239, 242];
     const white = [255, 255, 255];
+
+    const defectLength = d.defectDetails.length;
+    const dense = d.type === 'Auszug' || defectLength > 260;
+    const veryDense = defectLength > 430;
+    const sectionGap = veryDense ? 3.4 : dense ? 4.4 : 6.2;
+    const sectionBodyGap = veryDense ? 8.4 : 9.6;
+    const rowBase = veryDense ? 10.1 : 11.0;
+    const rowAfter = veryDense ? 2.8 : 3.8;
+    const keyH = veryDense ? 18 : 20;
+    const sigPreferredH = veryDense ? 14 : dense ? 16 : 18;
 
     let y = 20;
     let sectionCount = 0;
@@ -153,49 +161,41 @@
       doc.line(x1, yy, x2, yy);
     };
 
-    const pageHeader = (continuation = false) => {
-      if (continuation) {
-        text('Übergabeprotokoll', M, 18, 9.5, 'bold', ink);
-        text(d.objectRoom, R, 18, 7.5, 'normal', muted, { align: 'right' });
-        hLine(22, rule, 0.25);
-        y = 31;
-        sectionCount = 0;
-        return;
+    const fitSingleLine = (value, x, yy, maxWidth, startSize, minSize, style = 'normal', color = ink, options = {}) => {
+      let size = startSize;
+      doc.setFont('helvetica', style);
+      while (size > minSize) {
+        doc.setFontSize(size);
+        if (doc.getTextWidth(String(value || '')) <= maxWidth) break;
+        size -= 0.25;
       }
-
-      text('Übergabeprotokoll', M, y, 18, 'bold', ink);
-      text(d.type === 'Auszug' ? 'AUSZUG' : 'EINZUG', R, y - 0.3, 7.5, 'bold', muted, { align: 'right' });
-      y += 6.5;
-      text(d.objectRoom, M, y, 10.2, 'normal', muted);
-      text(d.moveDate, R, y, 8.2, 'normal', muted, { align: 'right' });
-      y += 6;
-      hLine(y, ink, 0.55);
-      y += 9;
+      text(value, x, yy, size, style, color, options);
     };
 
-    const ensureSpace = (needed) => {
-      if (y + needed <= 274) return;
-      doc.addPage();
-      pageHeader(true);
-    };
+    fitSingleLine('Übergabeprotokoll', M, y, 100, 18, 15, 'bold', ink);
+    text(d.type === 'Auszug' ? 'AUSZUG' : 'EINZUG', R, y - 0.3, 7.5, 'bold', muted, { align: 'right' });
+    y += 6.3;
+    fitSingleLine(d.objectRoom, M, y, 125, 10.2, 7.6, 'normal', muted);
+    text(d.moveDate, R, y, 8.2, 'normal', muted, { align: 'right' });
+    y += 6;
+    hLine(y, ink, 0.55);
+    y += 8.5;
 
     const section = (number, title) => {
-      const gapBefore = sectionCount === 0 ? 0 : 7;
-      ensureSpace(18 + gapBefore);
-      y += gapBefore;
-      text(String(number).padStart(2, '0'), M, y, 7.2, 'bold', lightText);
-      text(title, M + 10, y, 10.8, 'bold', ink);
-      hLine(y + 3.5, rule, 0.25);
-      y += 10.5;
+      if (sectionCount > 0) y += sectionGap;
+      text(String(number).padStart(2, '0'), M, y, 7.1, 'bold', lightText);
+      text(title, M + 10, y, 10.6, 'bold', ink);
+      hLine(y + 3.4, rule, 0.25);
+      y += sectionBodyGap;
       sectionCount += 1;
     };
 
     const fieldCell = (label, value, x, yy, width, options = {}) => {
-      const valueSize = options.valueSize || 9.6;
+      const valueSize = options.valueSize || 9.4;
       const bold = Boolean(options.bold);
-      text(label, x, yy, 6.9, 'normal', lightText);
+      text(label, x, yy, 6.7, 'normal', lightText);
       const lines = doc.splitTextToSize(value || '—', width);
-      text(lines, x, yy + 4.7, valueSize, bold ? 'bold' : 'normal', ink);
+      text(lines, x, yy + 4.5, valueSize, bold ? 'bold' : 'normal', ink);
       return lines.length;
     };
 
@@ -205,112 +205,109 @@
       let rightLines = 1;
       if (right) rightLines = fieldCell(right.label, right.value, COL2, top, HALF, right.options || {});
       const lines = Math.max(leftLines, rightLines);
-      const rowH = Math.max(11.5, 7 + lines * 4.2);
-      if (options.divider !== false) hLine(top + rowH, rule, 0.2);
-      y = top + rowH + 4.5;
+      const rowH = Math.max(rowBase, 6.6 + lines * 3.8);
+      if (options.divider) hLine(top + rowH, rule, 0.2);
+      y = top + rowH + rowAfter;
     };
 
     const checkbox = (checked, label, yy) => {
-      const s = 3.15;
+      const s = 3.1;
       doc.setDrawColor(...ink);
       doc.setLineWidth(0.3);
-      doc.rect(M, yy - 2.5, s, s);
+      doc.rect(M, yy - 2.45, s, s);
       if (checked) {
         doc.setLineWidth(0.48);
         doc.line(M + 0.65, yy - 0.9, M + 1.4, yy - 0.15);
-        doc.line(M + 1.4, yy - 0.15, M + 2.65, yy - 2.0);
+        doc.line(M + 1.4, yy - 0.15, M + 2.6, yy - 1.95);
       }
-      text(label, M + 5.5, yy, 8.7, 'normal', ink);
+      text(label, M + 5.4, yy, veryDense ? 8.1 : 8.5, 'normal', ink);
     };
-
-    const drawFooter = () => {
-      const total = doc.getNumberOfPages();
-      for (let page = 1; page <= total; page += 1) {
-        doc.setPage(page);
-        hLine(282, rule, 0.2);
-        text(d.objectRoom, M, 287.2, 6.6, 'normal', muted);
-        text(`Seite ${page} von ${total}`, R, 287.2, 6.6, 'normal', muted, { align: 'right' });
-      }
-    };
-
-    pageHeader(false);
 
     section(1, 'Übergabe');
-
     fieldRow(
       { label: 'Vollständiger Name', value: d.fullName, options: { bold: true } },
-      { label: 'Ein-/Auszugsdatum', value: d.moveDate },
-      { divider: false }
+      { label: 'Ein-/Auszugsdatum', value: d.moveDate }
     );
 
     if (d.type === 'Auszug') {
-      y += 1.5;
       fieldRow(
-        { label: 'IBAN', value: d.iban || '—' },
-        { label: 'Neue Anschrift', value: d.newAddress || '—' },
-        { divider: false }
+        { label: 'IBAN', value: d.iban || '—', options: { valueSize: 8.8 } },
+        { label: 'Neue Anschrift', value: d.newAddress || '—', options: { valueSize: 8.8 } }
       );
     }
 
     section(2, 'Zustand');
 
     if (d.defects === 'Keine') {
-      text(`Bei der Begehung am ${d.inspectionDate} wurden keine Mängel festgestellt.`, M, y, 9, 'normal', ink);
-      y += 9;
+      text(`Bei der Begehung am ${d.inspectionDate} wurden keine Mängel festgestellt.`, M, y, veryDense ? 8.3 : 8.8, 'normal', ink);
+      y += veryDense ? 7.2 : 8.2;
     } else {
-      text(`Bei der Begehung am ${d.inspectionDate} wurden folgende Mängel festgestellt:`, M, y, 9, 'normal', ink);
-      y += 6;
-      const defectLines = doc.splitTextToSize(d.defectDetails, CW - 8);
-      const blockH = Math.max(16, defectLines.length * 4.2 + 8);
-      ensureSpace(blockH + 28);
+      text(`Bei der Begehung am ${d.inspectionDate} wurden folgende Mängel festgestellt:`, M, y, veryDense ? 8.1 : 8.6, 'normal', ink);
+      y += 5.5;
+
+      const maxDefectH = veryDense ? 39 : dense ? 43 : 47;
+      let defectFont = veryDense ? 6.7 : 7.6;
+      let defectLineH = veryDense ? 3.0 : 3.35;
+      let defectLines = doc.splitTextToSize(d.defectDetails, CW - 8);
+
+      while ((defectLines.length * defectLineH + 10) > maxDefectH && defectFont > 5.8) {
+        defectFont -= 0.2;
+        defectLineH = Math.max(2.65, defectLineH - 0.08);
+        doc.setFontSize(defectFont);
+        defectLines = doc.splitTextToSize(d.defectDetails, CW - 8);
+      }
+
+      const blockH = Math.min(maxDefectH, Math.max(15, defectLines.length * defectLineH + 9));
       doc.setFillColor(...soft);
       doc.setDrawColor(...rule);
       doc.setLineWidth(0.2);
       doc.rect(M, y, CW, blockH, 'FD');
-      text('Festgestellte Mängel', M + 4, y + 4.8, 6.8, 'bold', lightText);
-      text(defectLines, M + 4, y + 10.2, 8.6, 'normal', ink);
-      y += blockH + 7;
+      text('Festgestellte Mängel', M + 4, y + 4.5, 6.5, 'bold', lightText);
+      text(defectLines, M + 4, y + 9.2, defectFont, 'normal', ink, { lineHeightFactor: 1.08 });
+      y += blockH + (veryDense ? 4 : 5.5);
     }
 
-    text('Zustand des Zimmers', M, y, 7, 'bold', lightText);
-    y += 6;
-    checkbox(d.checkWaste, 'Altglas, Müll und Pfand entsorgt', y); y += 6;
-    checkbox(d.checkFloor, 'Zimmerboden gesaugt und feucht gewischt', y); y += 6;
-    checkbox(d.checkFurniture, 'Oberflächen von allen Möbeln feucht gewischt', y); y += 8;
+    text('Zustand des Zimmers', M, y, 6.8, 'bold', lightText);
+    y += 5.3;
+    const checklistStep = veryDense ? 5.2 : 5.7;
+    checkbox(d.checkWaste, 'Altglas, Müll und Pfand entsorgt', y); y += checklistStep;
+    checkbox(d.checkFloor, 'Zimmerboden gesaugt und feucht gewischt', y); y += checklistStep;
+    checkbox(d.checkFurniture, 'Oberflächen von allen Möbeln feucht gewischt', y); y += checklistStep;
 
     section(3, 'Schlüssel');
-    text('Abschließend wurden folgende Schlüssel übergeben:', M, y, 8.8, 'normal', ink);
-    y += 7;
+    text('Abschließend wurden folgende Schlüssel übergeben:', M, y, veryDense ? 8.1 : 8.6, 'normal', ink);
+    y += veryDense ? 5.8 : 6.6;
 
     const keyTop = y;
-    const keyH = 22;
     doc.setFillColor(...soft);
     doc.rect(M, keyTop, CW, keyH, 'F');
     doc.setDrawColor(...softStrong);
     doc.setLineWidth(0.25);
-    doc.line(M + CW / 2, keyTop + 4, M + CW / 2, keyTop + keyH - 4);
+    doc.line(M + CW / 2, keyTop + 3.5, M + CW / 2, keyTop + keyH - 3.5);
 
-    text('Haus- und Wohnungsschlüssel', M + 5, keyTop + 6, 6.8, 'normal', lightText);
-    text(d.houseKeys, M + 5, keyTop + 15.2, 13, 'bold', ink);
-    text('Stück', M + 13.5, keyTop + 15.2, 8, 'normal', muted);
+    const keyLabelY = keyTop + (veryDense ? 5.2 : 5.8);
+    const keyValueY = keyTop + (veryDense ? 13.2 : 14.3);
+    text('Haus- und Wohnungsschlüssel', M + 5, keyLabelY, 6.5, 'normal', lightText);
+    text(d.houseKeys, M + 5, keyValueY, veryDense ? 11.5 : 12.5, 'bold', ink);
+    text('Stück', M + 13.5, keyValueY, 7.6, 'normal', muted);
 
     const keyRight = M + CW / 2 + 5;
-    text('Zimmerschlüssel', keyRight, keyTop + 6, 6.8, 'normal', lightText);
-    text(d.roomKeys, keyRight, keyTop + 15.2, 13, 'bold', ink);
-    text('Stück', keyRight + 8.5, keyTop + 15.2, 8, 'normal', muted);
-    y += keyH + 2;
+    text('Zimmerschlüssel', keyRight, keyLabelY, 6.5, 'normal', lightText);
+    text(d.roomKeys, keyRight, keyValueY, veryDense ? 11.5 : 12.5, 'bold', ink);
+    text('Stück', keyRight + 8.5, keyValueY, 7.6, 'normal', muted);
+    y += keyH;
 
     section(4, 'Unterschriften');
     fieldRow(
       { label: 'Ort', value: d.signPlace },
-      { label: 'Datum', value: d.signDate },
-      { divider: false }
+      { label: 'Datum', value: d.signDate }
     );
 
-    ensureSpace(40);
-    const sigTop = y + 1;
-    const sigH = 20;
-    const sigLine = sigTop + sigH + 1;
+    const labelSpace = 7;
+    const availableForSignature = Math.max(11, CONTENT_BOTTOM - y - labelSpace);
+    const sigH = Math.max(11, Math.min(sigPreferredH, availableForSignature));
+    const sigTop = y;
+    const sigLine = sigTop + sigH + 0.8;
 
     doc.setFillColor(...white);
     doc.rect(M, sigTop, HALF, sigH, 'F');
@@ -322,10 +319,12 @@
     doc.setLineWidth(0.3);
     doc.line(M, sigLine, M + HALF, sigLine);
     doc.line(COL2, sigLine, COL2 + HALF, sigLine);
-    text(`Unterschrift Mieter · ${d.fullName}`, M, sigLine + 5, 6.8, 'normal', muted);
-    text('Unterschrift Vermieter', COL2, sigLine + 5, 6.8, 'normal', muted);
+    text(`Unterschrift Mieter · ${d.fullName}`, M, sigLine + 4.5, 6.5, 'normal', muted);
+    text('Unterschrift Vermieter', COL2, sigLine + 4.5, 6.5, 'normal', muted);
 
-    drawFooter();
+    hLine(282, rule, 0.2);
+    fitSingleLine(d.objectRoom, M, 287.2, 120, 6.6, 5.8, 'normal', muted);
+    text('Seite 1 von 1', R, 287.2, 6.6, 'normal', muted, { align: 'right' });
 
     const filename = `Uebergabeprotokoll_${sanitizeFilename(d.fullName)}_${d.moveDateRaw}.pdf`;
     return { doc, filename, data: d };
@@ -335,7 +334,7 @@
     .filter(Boolean)
     .join(' ');
 
-  async function shareModernPdf() {
+  async function sharePdf() {
     if (!validate()) return;
 
     const oldLabel = shareButton.querySelector('span')?.textContent || 'PDF erstellen & teilen';
@@ -375,7 +374,7 @@
     }
   }
 
-  function downloadModernPdf() {
+  function downloadPdf() {
     if (!validate()) return;
     try {
       const { doc, filename } = buildPdf();
@@ -390,12 +389,12 @@
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     event.stopImmediatePropagation();
-    shareModernPdf();
+    sharePdf();
   }, true);
 
   downloadButton.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopImmediatePropagation();
-    downloadModernPdf();
+    downloadPdf();
   }, true);
 })();
