@@ -132,8 +132,6 @@
       unlockPageAfterSigning();
     });
 
-    // Extra Safari/iPadOS protection. touch-action:none already handles most
-    // gestures, these listeners stop scroll chaining at the canvas boundary.
     ['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach((type) => {
       canvas.addEventListener(type, (e) => e.preventDefault(), { passive: false });
     });
@@ -272,108 +270,169 @@
   }
 
   function buildPdf() {
-    if (!window.jspdf || !window.jspdf.jsPDF) throw new Error('PDF-Bibliothek konnte nicht geladen werden. Bitte Internetverbindung prüfen.');
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+      throw new Error('PDF-Bibliothek konnte nicht geladen werden. Bitte Internetverbindung prüfen.');
+    }
+
     const { jsPDF } = window.jspdf;
     const d = formData();
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
-    const W = 210;
-    const margin = 16;
-    const contentW = W - margin * 2;
-    const ink = [15, 23, 42];
-    const muted = [100, 116, 139];
-    const line = [214, 222, 232];
-    const pale = [244, 246, 248];
-    let y = 17;
 
-    const txt = (text, x, yy, size = 9.5, style = 'normal', color = ink, options = {}) => {
+    const W = 210;
+    const margin = 18;
+    const right = W - margin;
+    const contentW = right - margin;
+    const colGap = 12;
+    const colW = (contentW - colGap) / 2;
+    const col2 = margin + colW + colGap;
+
+    const ink = [28, 28, 30];
+    const muted = [92, 92, 98];
+    const line = [188, 188, 194];
+    const faint = [225, 225, 229];
+    const paper = [255, 255, 255];
+
+    let y = 20;
+
+    const text = (value, x, yy, size = 9, style = 'normal', color = ink, options = {}) => {
       doc.setFont('helvetica', style);
       doc.setFontSize(size);
       doc.setTextColor(...color);
-      doc.text(String(text ?? ''), x, yy, options);
+      if (Array.isArray(value)) doc.text(value, x, yy, options);
+      else doc.text(String(value ?? ''), x, yy, options);
     };
-    const rule = (yy) => { doc.setDrawColor(...line); doc.setLineWidth(.3); doc.line(margin, yy, W - margin, yy); };
-    const section = (num, title) => {
-      doc.setFillColor(...pale); doc.roundedRect(margin, y - 4.4, 8.5, 8.5, 2, 2, 'F');
-      txt(num, margin + 4.25, y + 1.2, 7.5, 'bold', ink, { align: 'center' });
-      txt(title, margin + 12, y + 1.4, 11.5, 'bold');
-      y += 9.5;
+
+    const hRule = (yy, color = line, width = 0.25) => {
+      doc.setDrawColor(...color);
+      doc.setLineWidth(width);
+      doc.line(margin, yy, right, yy);
     };
-    const labelValue = (label, value, x, yy, width) => {
-      txt(label, x, yy, 7.2, 'bold', muted);
+
+    const section = (title) => {
+      y += 2;
+      text(title, margin, y, 10.5, 'bold');
+      y += 3.3;
+      hRule(y, line, 0.28);
+      y += 6.5;
+    };
+
+    const field = (label, value, x, yy, width, options = {}) => {
+      const { valueSize = 9.6, boldValue = false } = options;
+      text(label, x, yy, 7.1, 'normal', muted);
       const lines = doc.splitTextToSize(value || '—', width);
-      txt(lines, x, yy + 5, 9.4, 'normal', ink);
+      text(lines, x, yy + 4.8, valueSize, boldValue ? 'bold' : 'normal', ink);
+      return lines.length;
     };
+
     const checkbox = (checked, label, yy) => {
-      doc.setDrawColor(...ink); doc.setLineWidth(.35); doc.rect(margin, yy - 3, 3.4, 3.4);
+      const box = 3.2;
+      doc.setDrawColor(...ink);
+      doc.setLineWidth(0.3);
+      doc.rect(margin, yy - 2.6, box, box);
       if (checked) {
-        doc.setLineWidth(.55); doc.line(margin + .7, yy - 1.2, margin + 1.5, yy - .3); doc.line(margin + 1.5, yy - .3, margin + 3, yy - 2.5);
+        doc.setLineWidth(0.45);
+        doc.line(margin + 0.65, yy - 1.0, margin + 1.45, yy - 0.2);
+        doc.line(margin + 1.45, yy - 0.2, margin + 2.7, yy - 2.1);
       }
-      txt(label, margin + 6, yy, 8.6);
+      text(label, margin + 5.5, yy, 8.6, 'normal');
     };
 
-    txt('ÜBERGABEPROTOKOLL', margin, y, 8, 'bold', muted);
-    y += 8;
-    txt(d.objectRoom, margin, y, 19, 'bold');
-    y += 6.5;
-    txt(`${d.type === 'Einzug' ? 'Vor dem Einzug' : 'Vor dem Auszug'} · ${d.moveDate}`, margin, y, 9.2, 'normal', muted);
+    const ensureSpace = (needed) => {
+      if (y + needed <= 273) return;
+      doc.addPage();
+      y = 20;
+    };
+
+    const drawFooter = () => {
+      const total = doc.getNumberOfPages();
+      for (let page = 1; page <= total; page += 1) {
+        doc.setPage(page);
+        doc.setDrawColor(...faint);
+        doc.setLineWidth(0.2);
+        doc.line(margin, 282, right, 282);
+        text(`Übergabeprotokoll · ${d.objectRoom}`, margin, 287.4, 6.8, 'normal', muted);
+        text(`Seite ${page} von ${total}`, right, 287.4, 6.8, 'normal', muted, { align: 'right' });
+      }
+    };
+
+    text('Übergabeprotokoll', margin, y, 17, 'bold');
+    text('Wohnungs- / Zimmerübergabe', right, y - 0.4, 8, 'normal', muted, { align: 'right' });
     y += 7;
-    rule(y); y += 9;
+    hRule(y, ink, 0.5);
+    y += 9;
 
-    section('01', 'Übergabe');
-    labelValue('Vollständiger Name', d.fullName, margin, y, 82);
-    labelValue('Ein-/Auszugsdatum', d.moveDate, 111, y, 83);
-    y += 15;
+    section('1. Übergabe');
+
+    field('Objekt / Zimmer', d.objectRoom, margin, y, contentW, { valueSize: 10.2, boldValue: true });
+    y += 12;
+    field('Vollständiger Name', d.fullName, margin, y, contentW);
+    y += 12;
+    field('Art der Übergabe', d.type === 'Einzug' ? 'Vor dem Einzug' : 'Vor dem Auszug', margin, y, colW);
+    field('Ein-/Auszugsdatum', d.moveDate, col2, y, colW);
+    y += 12;
+
     if (d.type === 'Auszug') {
-      labelValue('IBAN', d.iban || '—', margin, y, 82);
-      labelValue('Neue Anschrift', d.newAddress || '—', 111, y, 83);
-      y += 16;
+      field('IBAN', d.iban || '—', margin, y, colW);
+      field('Neue Anschrift', d.newAddress || '—', col2, y, colW);
+      y += 14;
     }
-    rule(y); y += 9;
 
-    section('02', 'Begehung & Zustand');
-    labelValue('Datum der Begehung', d.inspectionDate, margin, y, 60);
-    labelValue('Mängel festgestellt?', d.defects === 'Keine' ? 'Keine' : 'Folgende', 82, y, 60);
-    y += 14;
-    if (d.defects === 'Folgende') {
-      txt('Festgestellte Mängel', margin, y, 7.2, 'bold', muted);
-      const defectLines = doc.splitTextToSize(d.defectDetails, contentW);
-      txt(defectLines.slice(0, 7), margin, y + 5, 8.4, 'normal', ink);
-      y += Math.min(defectLines.length, 7) * 4.1 + 8;
+    section('2. Begehung und Zustand');
+
+    if (d.defects === 'Keine') {
+      text(`Bei der Begehung am ${d.inspectionDate} wurden keine Mängel festgestellt.`, margin, y, 9);
+      y += 9;
     } else {
-      txt('Bei der Begehung wurden keine Mängel festgestellt.', margin, y + 1, 8.6);
-      y += 8;
+      text(`Bei der Begehung am ${d.inspectionDate} wurden folgende Mängel festgestellt:`, margin, y, 9);
+      y += 6;
+      const defectLines = doc.splitTextToSize(d.defectDetails, contentW);
+      ensureSpace(defectLines.length * 4.2 + 35);
+      text(defectLines, margin, y, 8.8, 'normal');
+      y += defectLines.length * 4.2 + 6;
     }
-    txt('Zustand des Zimmers', margin, y, 7.2, 'bold', muted); y += 6;
+
+    text('Zustand des Zimmers', margin, y, 7.1, 'normal', muted);
+    y += 6;
     checkbox(d.checkWaste, 'Altglas, Müll und Pfand entsorgt', y); y += 6;
     checkbox(d.checkFloor, 'Zimmerboden gesaugt und feucht gewischt', y); y += 6;
     checkbox(d.checkFurniture, 'Oberflächen von allen Möbeln feucht gewischt', y); y += 8;
-    rule(y); y += 9;
 
-    section('03', 'Schlüssel');
-    labelValue('Haus- und Wohnungsschlüssel', `${d.houseKeys} Stück`, margin, y, 82);
-    labelValue('Zimmerschlüssel', `${d.roomKeys} Stück`, 111, y, 83);
-    y += 15;
-    rule(y); y += 9;
+    ensureSpace(42);
+    section('3. Schlüssel');
 
-    section('04', 'Unterschriften');
-    labelValue('Ort', d.signPlace, margin, y, 82);
-    labelValue('Datum', d.signDate, 111, y, 83);
-    y += 13;
+    text('Abschließend wurden folgende Schlüssel übergeben:', margin, y, 9);
+    y += 9;
+    field('Haus- und Wohnungsschlüssel', `${d.houseKeys} Stück`, margin, y, colW);
+    field('Zimmerschlüssel', `${d.roomKeys} Stück`, col2, y, colW);
+    y += 14;
 
-    const sigY = y;
-    const sigW = 82;
-    const sigH = 25;
-    doc.setDrawColor(...line);
-    doc.roundedRect(margin, sigY, sigW, sigH, 2, 2);
-    doc.roundedRect(111, sigY, sigW, sigH, 2, 2);
-    doc.addImage(d.tenantSignature, 'PNG', margin + 2, sigY + 2, sigW - 4, sigH - 5, undefined, 'FAST');
-    doc.addImage(d.landlordSignature, 'PNG', 113, sigY + 2, sigW - 4, sigH - 5, undefined, 'FAST');
-    txt('Unterschrift Mieter', margin, sigY + sigH + 5, 7.2, 'bold', muted);
-    txt('Unterschrift Vermieter', 111, sigY + sigH + 5, 7.2, 'bold', muted);
+    ensureSpace(65);
+    section('4. Unterschriften');
 
-    doc.setDrawColor(...line); doc.line(margin, 285, W - margin, 285);
-    txt('Übergabeprotokoll · digital erstellt', margin, 290, 6.8, 'normal', muted);
-    txt(`Erstellt am ${formatDate(todayISO())}`, W - margin, 290, 6.8, 'normal', muted, { align: 'right' });
+    field('Ort', d.signPlace, margin, y, colW);
+    field('Datum', d.signDate, col2, y, colW);
+    y += 14;
+
+    const sigTop = y;
+    const sigW = colW;
+    const sigH = 20;
+    const sigLineY = sigTop + sigH + 2;
+
+    doc.setFillColor(...paper);
+    doc.rect(margin, sigTop, sigW, sigH, 'F');
+    doc.rect(col2, sigTop, sigW, sigH, 'F');
+    doc.addImage(d.tenantSignature, 'PNG', margin + 1.5, sigTop + 0.8, sigW - 3, sigH - 2.2, undefined, 'FAST');
+    doc.addImage(d.landlordSignature, 'PNG', col2 + 1.5, sigTop + 0.8, sigW - 3, sigH - 2.2, undefined, 'FAST');
+
+    doc.setDrawColor(...ink);
+    doc.setLineWidth(0.3);
+    doc.line(margin, sigLineY, margin + sigW, sigLineY);
+    doc.line(col2, sigLineY, col2 + sigW, sigLineY);
+
+    text(`Unterschrift Mieter · ${d.fullName}`, margin, sigLineY + 4.8, 7, 'normal', muted);
+    text('Unterschrift Vermieter', col2, sigLineY + 4.8, 7, 'normal', muted);
+
+    drawFooter();
 
     const filename = `Uebergabeprotokoll_${sanitizeFilename(d.fullName)}_${document.getElementById('moveDate').value}.pdf`;
     return { doc, filename };
@@ -394,7 +453,11 @@
       } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 1500);
         showStatus('Direktes Teilen wird von diesem Browser nicht unterstützt. Die PDF wurde stattdessen heruntergeladen.');
       }
@@ -423,7 +486,11 @@
     }
   }
 
-  form.addEventListener('submit', (e) => { e.preventDefault(); sharePdf(); });
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    sharePdf();
+  });
+
   downloadPdfButton.addEventListener('click', downloadPdf);
 
   resetButton.addEventListener('click', () => {
@@ -437,7 +504,9 @@
 
   function resetAll() {
     form.reset();
-    ['moveDate', 'inspectionDate', 'signDate'].forEach((id) => { document.getElementById(id).value = todayISO(); });
+    ['moveDate', 'inspectionDate', 'signDate'].forEach((id) => {
+      document.getElementById(id).value = todayISO();
+    });
     clearSignature('tenantSignature');
     clearSignature('landlordSignature');
     defectDetails.value = '';
@@ -446,9 +515,5 @@
     updateDefectFields();
     clearStatus();
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
   }
 })();
