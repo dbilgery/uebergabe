@@ -25,10 +25,35 @@
   });
 
   const signatureState = new Map();
+  let signingLockCount = 0;
+
+  const blockDocumentScroll = (e) => {
+    if (signingLockCount > 0) e.preventDefault();
+  };
+
+  function lockPageWhileSigning() {
+    signingLockCount += 1;
+    if (signingLockCount !== 1) return;
+    document.addEventListener('touchmove', blockDocumentScroll, { passive: false, capture: true });
+    document.addEventListener('gesturestart', blockDocumentScroll, { passive: false, capture: true });
+    document.addEventListener('gesturechange', blockDocumentScroll, { passive: false, capture: true });
+    document.documentElement.style.overscrollBehaviorY = 'none';
+    document.body.style.overscrollBehaviorY = 'none';
+  }
+
+  function unlockPageAfterSigning() {
+    signingLockCount = Math.max(0, signingLockCount - 1);
+    if (signingLockCount !== 0) return;
+    document.removeEventListener('touchmove', blockDocumentScroll, true);
+    document.removeEventListener('gesturestart', blockDocumentScroll, true);
+    document.removeEventListener('gesturechange', blockDocumentScroll, true);
+    document.documentElement.style.overscrollBehaviorY = '';
+    document.body.style.overscrollBehaviorY = '';
+  }
 
   function setupSignatureCanvas(canvas) {
     const ctx = canvas.getContext('2d', { alpha: false });
-    const state = { drawing: false, signed: false, lastX: 0, lastY: 0 };
+    const state = { drawing: false, signed: false, lastX: 0, lastY: 0, pointerId: null };
     signatureState.set(canvas.id, state);
 
     function resizeCanvas() {
@@ -58,10 +83,14 @@
     }
 
     canvas.addEventListener('pointerdown', (e) => {
+      if (!e.isPrimary) return;
       e.preventDefault();
+      e.stopPropagation();
+      lockPageWhileSigning();
       canvas.setPointerCapture(e.pointerId);
       const p = pos(e);
       state.drawing = true;
+      state.pointerId = e.pointerId;
       state.signed = true;
       state.lastX = p.x;
       state.lastY = p.y;
@@ -69,8 +98,9 @@
     });
 
     canvas.addEventListener('pointermove', (e) => {
-      if (!state.drawing) return;
+      if (!state.drawing || e.pointerId !== state.pointerId) return;
       e.preventDefault();
+      e.stopPropagation();
       const p = pos(e);
       ctx.beginPath();
       ctx.moveTo(state.lastX, state.lastY);
@@ -82,12 +112,31 @@
 
     const stop = (e) => {
       if (!state.drawing) return;
+      if (e && state.pointerId !== null && e.pointerId !== state.pointerId) return;
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
       state.drawing = false;
       if (e && canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+      state.pointerId = null;
+      unlockPageAfterSigning();
     };
+
     canvas.addEventListener('pointerup', stop);
     canvas.addEventListener('pointercancel', stop);
-    canvas.addEventListener('pointerleave', (e) => { if (state.drawing && e.buttons === 0) stop(e); });
+    canvas.addEventListener('lostpointercapture', () => {
+      if (!state.drawing) return;
+      state.drawing = false;
+      state.pointerId = null;
+      unlockPageAfterSigning();
+    });
+
+    // Extra Safari/iPadOS protection. touch-action:none already handles most
+    // gestures, these listeners stop scroll chaining at the canvas boundary.
+    ['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach((type) => {
+      canvas.addEventListener(type, (e) => e.preventDefault(), { passive: false });
+    });
 
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas, { passive: true });
