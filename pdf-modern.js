@@ -44,8 +44,6 @@
     try {
       const ctx = canvas.getContext('2d');
       const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-      // Sample every fourth pixel. The canvas background is pure white;
-      // signature strokes are dark and therefore easy to distinguish.
       for (let i = 0; i < data.length; i += 16) {
         if (data[i] < 225 || data[i + 1] < 225 || data[i + 2] < 225) return true;
       }
@@ -124,7 +122,6 @@
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
 
     const PAGE_W = 210;
-    const PAGE_H = 297;
     const M = 18;
     const R = PAGE_W - M;
     const CW = R - M;
@@ -141,6 +138,7 @@
     const white = [255, 255, 255];
 
     let y = 20;
+    let sectionCount = 0;
 
     const text = (value, x, yy, size = 9, style = 'normal', color = ink, options = {}) => {
       doc.setFont('helvetica', style);
@@ -161,6 +159,7 @@
         text(d.objectRoom, R, 18, 7.5, 'normal', muted, { align: 'right' });
         hLine(22, rule, 0.25);
         y = 31;
+        sectionCount = 0;
         return;
       }
 
@@ -181,11 +180,14 @@
     };
 
     const section = (number, title) => {
-      ensureSpace(18);
+      const gapBefore = sectionCount === 0 ? 0 : 7;
+      ensureSpace(18 + gapBefore);
+      y += gapBefore;
       text(String(number).padStart(2, '0'), M, y, 7.2, 'bold', lightText);
       text(title, M + 10, y, 10.8, 'bold', ink);
       hLine(y + 3.5, rule, 0.25);
       y += 10.5;
+      sectionCount += 1;
     };
 
     const fieldCell = (label, value, x, yy, width, options = {}) => {
@@ -233,29 +235,23 @@
 
     pageHeader(false);
 
-    // 01 - cleaner field arrangement: address full width, then name/date,
-    // then (only for move-out) IBAN/address in a balanced second row.
     section(1, 'Übergabe');
-    fieldRow(
-      { label: 'Objekt / Zimmer', value: d.objectRoom, options: { valueSize: 10.5, bold: true } },
-      null
-    );
+
     fieldRow(
       { label: 'Vollständiger Name', value: d.fullName, options: { bold: true } },
-      { label: 'Ein-/Auszugsdatum', value: d.moveDate }
+      { label: 'Ein-/Auszugsdatum', value: d.moveDate },
+      { divider: false }
     );
 
     if (d.type === 'Auszug') {
+      y += 1.5;
       fieldRow(
         { label: 'IBAN', value: d.iban || '—' },
         { label: 'Neue Anschrift', value: d.newAddress || '—' },
         { divider: false }
       );
-    } else {
-      y -= 1.5;
     }
 
-    // 02 - heading intentionally shortened to "Zustand".
     section(2, 'Zustand');
 
     if (d.defects === 'Keine') {
@@ -282,7 +278,6 @@
     checkbox(d.checkFloor, 'Zimmerboden gesaugt und feucht gewischt', y); y += 6;
     checkbox(d.checkFurniture, 'Oberflächen von allen Möbeln feucht gewischt', y); y += 8;
 
-    // 03 - both key types share one equal-height row and identical baseline.
     section(3, 'Schlüssel');
     text('Abschließend wurden folgende Schlüssel übergeben:', M, y, 8.8, 'normal', ink);
     y += 7;
@@ -303,7 +298,7 @@
     text('Zimmerschlüssel', keyRight, keyTop + 6, 6.8, 'normal', lightText);
     text(d.roomKeys, keyRight, keyTop + 15.2, 13, 'bold', ink);
     text('Stück', keyRight + 8.5, keyTop + 15.2, 8, 'normal', muted);
-    y += keyH + 7;
+    y += keyH + 2;
 
     section(4, 'Unterschriften');
     fieldRow(
@@ -392,7 +387,6 @@
     }
   }
 
-  // Capture-phase handlers take precedence over the legacy PDF handlers in app.js.
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     event.stopImmediatePropagation();
