@@ -134,11 +134,11 @@
         <div class="grid two">
           <label class="field">
             <span>Haus- und Wohnungsschlüssel</span>
-            <input id="houseKeys" name="houseKeys" type="number" min="0" max="20" inputmode="numeric" placeholder="0" />
+            <input id="houseKeys" name="houseKeys" type="number" min="0" max="20" inputmode="numeric" value="1" />
           </label>
           <label class="field">
             <span>Zimmerschlüssel</span>
-            <input id="roomKeys" name="roomKeys" type="number" min="0" max="20" inputmode="numeric" placeholder="0" />
+            <input id="roomKeys" name="roomKeys" type="number" min="0" max="20" inputmode="numeric" value="1" />
           </label>
         </div>
       </section>
@@ -155,7 +155,7 @@
         <div class="grid two">
           <label class="field">
             <span>Ort <b>*</b></span>
-            <input id="signPlace" name="signPlace" type="text" autocomplete="address-level2" placeholder="z. B. Stuttgart" required />
+            <input id="signPlace" name="signPlace" type="text" autocomplete="address-level2" value="Stuttgart" required />
           </label>
           <label class="field">
             <span>Datum <b>*</b></span>
@@ -170,7 +170,6 @@
               <button type="button" class="text-button" data-clear-signature="tenantSignature">Löschen</button>
             </div>
             <canvas id="tenantSignature" class="signature-canvas" aria-label="Unterschrift Mieter"></canvas>
-            <p>Hier mit Apple Pencil unterschreiben</p>
           </div>
           <div class="signature-box">
             <div class="signature-label">
@@ -178,7 +177,6 @@
               <button type="button" class="text-button" data-clear-signature="landlordSignature">Löschen</button>
             </div>
             <canvas id="landlordSignature" class="signature-canvas" aria-label="Unterschrift Vermieter"></canvas>
-            <p>Hier mit Apple Pencil unterschreiben</p>
           </div>
         </div>
       </section>
