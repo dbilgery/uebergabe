@@ -1,4 +1,4 @@
-const CACHE = 'uebergabe-v1';
+const CACHE = 'uebergabe-v2';
 const LOCAL_ASSETS = ['./', './index.html', './styles.css', './app.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', 'https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js'];
 
 self.addEventListener('install', (event) => {
